@@ -1,0 +1,18 @@
+{
+  "name": "install-lua",
+  "version": "1.0.0",
+  "description": "Build and install Lua",
+  "main": "main.js",
+  "scripts": {
+    "build": "rm -rf dist && ncc build main.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@actions/cache": "^3.1.2",
+    "@actions/core": "^1.2.6",
+    "axios": "^1.6.2",
+    "@actions/exec": "^1.0.4",
+    "@actions/io": "^1.0.2",
+    "@actions/tool-cache": "^2.0.1"
+  }
+}
