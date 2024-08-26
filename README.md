@@ -20,13 +20,13 @@ Other Lua GitHub actions:
 Install Lua: (Will typically default to the latest release, 5.4.4 as of this readme)
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
 ```
 
 Install specific version of Lua:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
   with:
     luaVersion: "5.1.5"
 ```
@@ -34,7 +34,7 @@ Install specific version of Lua:
 Install specific version of LuaJIT:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
   with:
     luaVersion: "luajit-2.1.0-beta3"
 ```
@@ -45,7 +45,7 @@ include this line on non-Windows platforms, as the action will do nothing in tho
 
 ```yaml
 - uses: ilammy/msvc-dev-cmd@v1
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
 ```
 
 ## Inputs
@@ -115,7 +115,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
 
-    - uses: step-security/gh-actions-lua@v10
+    - uses: step-security/gh-actions-lua@v11
       with:
         luaVersion: "5.1.5"
 
@@ -152,7 +152,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@master
-    - uses: step-security/gh-actions-lua@v10
+    - uses: step-security/gh-actions-lua@v11
       with:
         luaVersion: ${{ matrix.luaVersion }}
 
