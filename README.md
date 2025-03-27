@@ -20,13 +20,13 @@ Other Lua GitHub actions:
 Install Lua: (Will typically default to the latest release, 5.4.4 as of this readme)
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
 ```
 
 Install specific version of Lua:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
   with:
     luaVersion: "5.1.5"
 ```
@@ -34,7 +34,7 @@ Install specific version of Lua:
 Install specific version of LuaJIT:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
   with:
     luaVersion: "luajit-2.1.0-beta3"
 ```
@@ -45,7 +45,7 @@ include this line on non-Windows platforms, as the action will do nothing in tho
 
 ```yaml
 - uses: ilammy/msvc-dev-cmd@v1
-- uses: step-security/gh-actions-lua@v10
+- uses: step-security/gh-actions-lua@v11
 ```
 
 ## Inputs
@@ -63,14 +63,15 @@ Examples of versions:
 * `"5.2.4"`
 * `"5.3.5"`
 * `"5.4.1"`
-* `"luajit-2.0.5"`
-* `"luajit-2.1.0-beta3"`
+* `"luajit-2.0"`
+* `"luajit-2.1"`
+* `"luajit-master"`
 * `"luajit-openresty"`
 
 The version specifies where the source is downloaded from:
 
-* `luajit-openresty` — will allways pull master from  https://github.com/openresty/luajit2
-* Anything starting with `luajit-` — from http://luajit.org/download.html
+* `luajit-openresty` — will always pull master from https://github.com/openresty/luajit2
+* Anything else starting with `luajit-` — pulls a master or version branch from https://github.com/luajit/luajit
 * Anything else — from https://www.lua.org/ftp/
 
 **Version aliases**
@@ -114,7 +115,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
 
-    - uses: step-security/gh-actions-lua@v10
+    - uses: step-security/gh-actions-lua@v11
       with:
         luaVersion: "5.1.5"
 
@@ -151,7 +152,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@master
-    - uses: step-security/gh-actions-lua@v10
+    - uses: step-security/gh-actions-lua@v11
       with:
         luaVersion: ${{ matrix.luaVersion }}
 
