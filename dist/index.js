@@ -70685,8 +70685,36 @@ const VERSION_ALIASES = {
   "5.1": "5.1.5",
   "5.2": "5.2.4",
   "5.3": "5.3.6",
-  "5.4": "5.4.4",
-  "luajit": "luajit-2.1.0-beta3",
+  "5.4": "5.4.7",
+  "luajit": "luajit-2.1",
+}
+
+const LUAJIT_REPOS = {
+  "luajit-2.0": {
+    "url": "https://github.com/luajit/luajit.git",
+    "branch": "v2.0",
+    "binary": "luajit"
+  },
+  "luajit-2.1": {
+    "url": "https://github.com/luajit/luajit.git",
+    "branch": "v2.1",
+    "binary": "luajit"
+  },
+  "luajit-2.1.0-beta3": {
+    "url": "https://github.com/luajit/luajit.git",
+    "branch": "v2.1.0-beta3",
+    "binary": "luajit-2.1.0-beta3"
+  },
+  "luajit-master": {
+    "url": "https://github.com/luajit/luajit.git",
+    "branch": "master",
+    "binary": "luajit"
+  },
+  "luajit-openresty": {
+    "url": "https://github.com/openresty/luajit2.git",
+    "branch": "v2.1-agentzh",
+    "binary": "luajit"
+  },
 }
 
 const isMacOS = () => (process.platform || "").startsWith("darwin")
@@ -70705,6 +70733,7 @@ const processCwd = () => {
 async function finish_luajit_install(src, dst, luajit) {
   if (isWindows()) {
     await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "bin", "lua51.dll"))
+    await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "lib", "lua51.dll"))
 
     await exec.exec(`ln -s ${luajit} lua.exe`, undefined, {
       cwd: pathJoin(dst, "bin")
@@ -70716,13 +70745,27 @@ async function finish_luajit_install(src, dst, luajit) {
   }
 }
 
-async function install_luajit_openresty(luaInstallPath) {
+async function install_luajit(luaInstallPath, luaVersion) {
+  const luajitVersion = luaVersion.substr("luajit-".length)
+
+  let repo = LUAJIT_REPOS[luaVersion];
+  if (!repo) {
+    repo = {
+      "url": LUAJIT_REPOS["luajit-master"].url,
+      "branch": "v" + luajitVersion,
+      "binary": "luajit"
+    }
+  }
+
   const buildPath = path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX)
   const luaCompileFlags = core.getInput('luaCompileFlags')
 
+  // "luajit" or "luajit2"
+  const baseDir = repo.url.match(/.*\/(.*)\.git/)[1]
+
   await io.mkdirP(buildPath)
 
-  await exec.exec("git clone https://github.com/openresty/luajit2.git", undefined, {
+  await exec.exec(`git clone --branch ${repo.branch} --single-branch ${repo.url}`, undefined, {
     cwd: buildPath
   })
 
@@ -70737,45 +70780,15 @@ async function install_luajit_openresty(luaInstallPath) {
   }
 
   await exec.exec(`make ${finalCompileFlags}`, undefined, {
-    cwd: pathJoin(buildPath, "luajit2"),
+    cwd: pathJoin(buildPath, baseDir),
     ...(isWindows() ? { env: { SHELL: 'cmd' }} : {})
   })
 
   await exec.exec(`make -j install PREFIX="${luaInstallPath}"`, undefined, {
-    cwd: pathJoin(buildPath, "luajit2")
+    cwd: pathJoin(buildPath, baseDir)
   })
 
-  await finish_luajit_install(pathJoin(buildPath, "luajit2", "src"), luaInstallPath, "luajit")
-}
-
-async function install_luajit(luaInstallPath, luajitVersion) {
-  const luaExtractPath = pathJoin(process.env["RUNNER_TEMP"], BUILD_PREFIX, `LuaJIT-${luajitVersion}`)
-
-  const luaCompileFlags = core.getInput('luaCompileFlags')
-
-  const luaSourceTar = await tc.downloadTool(`https://luajit.org/download/LuaJIT-${luajitVersion}.tar.gz`)
-  await io.mkdirP(luaExtractPath)
-  await tc.extractTar(luaSourceTar, path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX))
-
-  let finalCompileFlags = "-j"
-
-  if (isMacOS()) {
-    finalCompileFlags += " MACOSX_DEPLOYMENT_TARGET=10.15"
-  }
-
-  if (luaCompileFlags) {
-    finalCompileFlags += ` ${luaCompileFlags}`
-  }
-
-  await exec.exec(`make ${finalCompileFlags}`, undefined, {
-    cwd: luaExtractPath
-  })
-
-  await exec.exec(`make -j install PREFIX="${luaInstallPath}"`, undefined, {
-    cwd: luaExtractPath
-  })
-
-  await finish_luajit_install(pathJoin(luaExtractPath, "src"), luaInstallPath, `luajit-${luajitVersion}`)
+  await finish_luajit_install(pathJoin(buildPath, baseDir, "src"), luaInstallPath, repo.binary)
 }
 
 async function msvc_link(luaExtractPath, linkCmd, outFile, objs) {
@@ -70840,12 +70853,12 @@ async function install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVers
     }
   })
 
-  objs["lua"] = [ ...objs["lua"], ...objs["lib"] ]
-  objs["luac"] = [ ...objs["luac"], ...objs["lib"] ]
-
   let luaXYZ = luaVersion.split(".")
   let libFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".lib"
   let dllFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".dll"
+
+  objs["lua"] = [ ...objs["lua"], libFile ]
+  objs["luac"] = [ ...objs["luac"], ...objs["lib"] ]
 
   await msvc_link(luaExtractPath, "link /nologo /DLL", dllFile, objs["lib"]);
   await msvc_link(luaExtractPath, "link /nologo", "luac.exe", objs["luac"]);
@@ -70854,7 +70867,7 @@ async function install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVers
   const luaHpp = (await exists(pathJoin(src, "lua.hpp"))) ? "lua.hpp" : "../etc/lua.hpp"
   const headers = [ "lua.h", "luaconf.h", "lualib.h", "lauxlib.h", luaHpp ]
 
-  await install_files(pathJoin(luaInstallPath, "bin"), luaExtractPath, [ "lua.exe", "luac.exe" ])
+  await install_files(pathJoin(luaInstallPath, "bin"), luaExtractPath, [ "lua.exe", "luac.exe", dllFile ])
   await install_files(pathJoin(luaInstallPath, "lib"), luaExtractPath, [ dllFile, libFile ])
   await install_files(pathJoin(luaInstallPath, "include"), src, headers)
 }
@@ -70898,13 +70911,8 @@ async function install_plain_lua(luaInstallPath, luaVersion) {
 }
 
 async function install(luaInstallPath, luaVersion) {
-  if (luaVersion == "luajit-openresty") {
-    return await install_luajit_openresty(luaInstallPath)
-  }
-
   if (luaVersion.startsWith("luajit-")) {
-    const luajitVersion = luaVersion.substr("luajit-".length)
-    return await install_luajit(luaInstallPath, luajitVersion)
+    return await install_luajit(luaInstallPath, luaVersion)
   }
 
   return await install_plain_lua(luaInstallPath, luaVersion)
@@ -70980,7 +70988,6 @@ async function main() {
 main().catch(err => {
   core.setFailed(`Failed to install Lua: ${err}`);
 })
-
 
 module.exports = __webpack_exports__;
 /******/ })()
