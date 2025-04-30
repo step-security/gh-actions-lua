@@ -31,14 +31,28 @@ jobs:
 
     - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
+    - name: Restore Lua from cache
+      uses: actions/cache@v4
+      with:
+        path: .lua
+        key: lua-${{ matrix.luaVersion }}-${{ runner.os }}-${{ runner.arch }}
+
     - name: Build Lua
+      if: steps.restore-lua.outputs.cache-hit != 'true'
       uses: './'
       with:
         luaVersion: ${{ matrix.luaVersion }}
-        buildCache: false
 
     - name: Test Lua
       run: lua -e "print('hi from lua')"
+
+    - name: Save Lua to cache
+      if: steps.restore-lua.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: .lua
+        key: lua-${{ matrix.luaVersion }}-${{ runner.os }}-${{ runner.arch }}
+
 
   test-cache:
     needs: test
@@ -67,6 +81,12 @@ jobs:
         egress-policy: audit
 
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # main
+
+    - name: Restore Lua from cache
+      uses: actions/cache@v4
+      with:
+        path: .lua
+        key: lua-${{ matrix.luaVersion }}-${{ runner.os }}-${{ runner.arch }}
 
     - name: Get Lua from cache
       uses: './'
