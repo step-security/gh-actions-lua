@@ -1,21 +1,20 @@
-
-name: "Install Lua/LuaJIT"
-description: "Download, build, and install Lua or LuaJIT for use with scripts, tests and more"
+name: "Setup Lua Environment"
+description: "Build and configure Lua or LuaJIT runtime for GitHub Actions workflows"
 
 branding:
-  icon: 'moon'
-  color: 'blue'
+  icon: 'code'
+  color: 'purple'
 
 inputs:
   luaVersion:
-    description: "The version of Lua to install, must be available on https://www.lua.org/ftp/ or http://luajit.org/download.html"
+    description: "Target Lua version to install (supports 5.1, 5.2, 5.3, 5.4, luajit variants)"
     required: false
     default: "5.4"
   luaCompileFlags:
-    description: "Command line flags passed to make when building Lua"
+    description: "Additional compilation flags for building Lua from source"
     required: false
   buildCache:
-    description: "Set to 'false' to skip restoring .lua from cache and always compile it"
+    description: "Enable build caching to speed up subsequent runs"
     required: false
     default: 'true'
 

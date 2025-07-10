@@ -89022,261 +89022,14 @@ module.exports = /*#__PURE__*/JSON.parse('{"application/1d-interleaved-parityfec
 /******/ 	
 /************************************************************************/
 var __webpack_exports__ = {};
-
-const core = __nccwpck_require__(7484)
+const core = __nccwpck_require__(7484);
 const axios = __nccwpck_require__(7269);
-const exec = __nccwpck_require__(5236)
-const io = __nccwpck_require__(4994)
-const tc = __nccwpck_require__(3472)
-const ch = __nccwpck_require__(5116)
-const fsp = (__nccwpck_require__(9896).promises)
-
-const notice = (msg) => core.notice(`gh-actions-lua: ${msg}`)
-const warning = (msg) => core.warning(`gh-actions-lua: ${msg}`)
-
-const path = __nccwpck_require__(6928)
-
-const BUILD_PREFIX = ".lua-build" // this is a temporary folder where lua will be built
-const LUA_PREFIX = ".lua" // this is where Lua will be installed
-
-const VERSION_ALIASES = {
-  "5.1": "5.1.5",
-  "5.2": "5.2.4",
-  "5.3": "5.3.6",
-  "5.4": "5.4.7",
-  "luajit": "luajit-2.1",
-}
-
-const LUAJIT_REPOS = {
-  "luajit-2.0": {
-    "url": "https://github.com/luajit/luajit.git",
-    "branch": "v2.0",
-    "binary": "luajit"
-  },
-  "luajit-2.1": {
-    "url": "https://github.com/luajit/luajit.git",
-    "branch": "v2.1",
-    "binary": "luajit"
-  },
-  "luajit-2.1.0-beta3": {
-    "url": "https://github.com/luajit/luajit.git",
-    "branch": "v2.1.0-beta3",
-    "binary": "luajit-2.1.0-beta3"
-  },
-  "luajit-master": {
-    "url": "https://github.com/luajit/luajit.git",
-    "branch": "master",
-    "binary": "luajit"
-  },
-  "luajit-openresty": {
-    "url": "https://github.com/openresty/luajit2.git",
-    "branch": "v2.1-agentzh",
-    "binary": "luajit"
-  },
-}
-
-const isMacOS = () => (process.platform || "").startsWith("darwin")
-const isWindows = () => (process.platform || "").startsWith("win32")
-
-const exists = (filename, mode) => fsp.access(filename, mode).then(() => true, () => false)
-
-// Returns posix path for path.join()
-const pathJoin = path.posix.join
-
-// Returns posix path for process.cwd()
-const processCwd = () => {
-  return process.cwd().split(path.sep).join(path.posix.sep);
-}
-
-async function finish_luajit_install(src, dst, luajit) {
-  if (isWindows()) {
-    await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "bin", "lua51.dll"))
-    await fsp.copyFile(pathJoin(src, "lua51.dll"), pathJoin(dst, "lib", "lua51.dll"))
-
-    await exec.exec(`ln -s ${luajit} lua.exe`, undefined, {
-      cwd: pathJoin(dst, "bin")
-    })
-  } else {
-    await exec.exec(`ln -s ${luajit} lua`, undefined, {
-      cwd: pathJoin(dst, "bin")
-    })
-  }
-}
-
-async function install_luajit(luaInstallPath, luaVersion) {
-  const luajitVersion = luaVersion.substr("luajit-".length)
-
-  let repo = LUAJIT_REPOS[luaVersion];
-  if (!repo) {
-    repo = {
-      "url": LUAJIT_REPOS["luajit-master"].url,
-      "branch": "v" + luajitVersion,
-      "binary": "luajit"
-    }
-  }
-
-  const buildPath = path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX)
-  const luaCompileFlags = core.getInput('luaCompileFlags')
-
-  // "luajit" or "luajit2"
-  const baseDir = repo.url.match(/.*\/(.*)\.git/)[1]
-
-  await io.mkdirP(buildPath)
-
-  await exec.exec(`git clone --branch ${repo.branch} --single-branch ${repo.url}`, undefined, {
-    cwd: buildPath
-  })
-
-  let finalCompileFlags = "-j"
-
-  if (isMacOS()) {
-    finalCompileFlags += " MACOSX_DEPLOYMENT_TARGET=10.15"
-  }
-
-  if (luaCompileFlags) {
-    finalCompileFlags += ` ${luaCompileFlags}`
-  }
-
-  await exec.exec(`make ${finalCompileFlags}`, undefined, {
-    cwd: pathJoin(buildPath, baseDir),
-    ...(isWindows() ? { env: { SHELL: 'cmd' }} : {})
-  })
-
-  await exec.exec(`make -j install PREFIX="${luaInstallPath}"`, undefined, {
-    cwd: pathJoin(buildPath, baseDir)
-  })
-
-  await finish_luajit_install(pathJoin(buildPath, baseDir, "src"), luaInstallPath, repo.binary)
-}
-
-async function msvc_link(luaExtractPath, linkCmd, outFile, objs) {
-  await exec.exec(linkCmd + " /out:" + outFile, objs, {
-    cwd: luaExtractPath
-  })
-
-  let manifest = outFile + ".manifest"
-  if (await exists(manifest)) {
-    await exec.exec("mt /nologo", ["-manifest", manifest, "-outputresource:" + outFile], {
-      cwd: luaExtractPath
-    })
-  }
-}
-
-async function install_files(dstDir, srcDir, files) {
-  await io.mkdirP(dstDir)
-  for (let file of files) {
-    await fsp.copyFile(pathJoin(srcDir, file), pathJoin(dstDir, path.posix.basename(file)))
-  }
-}
-
-async function install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVersion) {
-  const luaCompileFlags = core.getInput('luaCompileFlags')
-
-  let cl = "cl /nologo /MD /O2 /W3 /c /D_CRT_SECURE_NO_DEPRECATE"
-
-  let objs = {
-    "lib": [],
-    "lua": [],
-    "luac": [],
-  }
-
-  let sources = {
-    "lua": [ "lua.c" ],
-    "luac": [ "luac.c", "print.c" ],
-  }
-
-  let src = pathJoin(luaExtractPath, "src")
-
-  await fsp.readdir(src).then(async (files) => {
-    for (let file of files) {
-      if (file.endsWith(".c")) {
-        let mode = sources["lua"].includes(file)
-                 ? "lua"
-                 : sources["luac"].includes(file)
-                 ? "luac"
-                 : "lib"
-
-        let srcName = pathJoin("src", file)
-
-        let args = (mode === "lib")
-                 ? [ "-DLUA_BUILD_AS_DLL", srcName ]
-                 : [ srcName ]
-
-        objs[mode].push(file.replace(".c", ".obj"))
-
-        await exec.exec(cl, args, {
-          cwd: luaExtractPath
-        })
-      }
-    }
-  })
-
-  let luaXYZ = luaVersion.split(".")
-  let libFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".lib"
-  let dllFile = "lua" + luaXYZ[0] + luaXYZ[1] + ".dll"
-
-  objs["lua"] = [ ...objs["lua"], libFile ]
-  objs["luac"] = [ ...objs["luac"], ...objs["lib"] ]
-
-  await msvc_link(luaExtractPath, "link /nologo /DLL", dllFile, objs["lib"]);
-  await msvc_link(luaExtractPath, "link /nologo", "luac.exe", objs["luac"]);
-  await msvc_link(luaExtractPath, "link /nologo", "lua.exe", objs["lua"]);
-
-  const luaHpp = (await exists(pathJoin(src, "lua.hpp"))) ? "lua.hpp" : "../etc/lua.hpp"
-  const headers = [ "lua.h", "luaconf.h", "lualib.h", "lauxlib.h", luaHpp ]
-
-  await install_files(pathJoin(luaInstallPath, "bin"), luaExtractPath, [ "lua.exe", "luac.exe", dllFile ])
-  await install_files(pathJoin(luaInstallPath, "lib"), luaExtractPath, [ dllFile, libFile ])
-  await install_files(pathJoin(luaInstallPath, "include"), src, headers)
-}
-
-async function install_plain_lua(luaInstallPath, luaVersion) {
-  const luaExtractPath = pathJoin(process.env["RUNNER_TEMP"], BUILD_PREFIX, `lua-${luaVersion}`)
-  const luaCompileFlags = core.getInput('luaCompileFlags')
-
-  const luaSourceTar = await tc.downloadTool(`https://lua.org/ftp/lua-${luaVersion}.tar.gz`)
-  await io.mkdirP(luaExtractPath)
-  await tc.extractTar(luaSourceTar, path.join(process.env["RUNNER_TEMP"], BUILD_PREFIX))
-
-  if (isWindows()) {
-    return await install_plain_lua_windows(luaExtractPath, luaInstallPath, luaVersion);
-  }
-
-  if (isMacOS()) {
-    await exec.exec("brew install readline ncurses")
-  } else {
-    await exec.exec("sudo apt-get install -q libreadline-dev libncurses-dev", undefined, {
-      env: {
-        DEBIAN_FRONTEND: "noninteractive",
-        TERM: "linux"
-      }
-    })
-  }
-
-  let finalCompileFlags = `-j ${isMacOS() ? "macosx" : "linux"}`
-
-  if (luaCompileFlags) {
-    finalCompileFlags += ` ${luaCompileFlags}`
-  }
-
-  await exec.exec(`make ${finalCompileFlags}`, undefined, {
-    cwd: luaExtractPath
-  })
-
-  await exec.exec(`make -j INSTALL_TOP="${luaInstallPath}" install`, undefined, {
-    cwd: luaExtractPath
-  })
-}
-
-async function install(luaInstallPath, luaVersion) {
-  if (luaVersion.startsWith("luajit-")) {
-    return await install_luajit(luaInstallPath, luaVersion)
-  }
-
-  return await install_plain_lua(luaInstallPath, luaVersion)
-}
-
-const makeCacheKey = (luaVersion, compileFlags) => `lua:${luaVersion}:${process.platform}:${process.arch}:${compileFlags}`
+const exec = __nccwpck_require__(5236);
+const io = __nccwpck_require__(4994);
+const tc = __nccwpck_require__(3472);
+const ch = __nccwpck_require__(5116);
+const fs = (__nccwpck_require__(9896).promises);
+const path = __nccwpck_require__(6928);
 
 async function validateSubscription() {
   const API_URL = `https://agent.api.stepsecurity.io/v1/github/${process.env.GITHUB_REPOSITORY}/actions/subscription`;
@@ -89295,58 +89048,289 @@ async function validateSubscription() {
   }
 }
 
+const LUA_BUILD_DIR = ".lua-build";
+const LUA_INSTALL_DIR = ".lua";
+
+const LUA_VERSIONS = {
+  "5.1": "5.1.5",
+  "5.2": "5.2.4", 
+  "5.3": "5.3.6",
+  "5.4": "5.4.7",
+  "luajit": "luajit-2.1"
+};
+
+const LUAJIT_CONFIG = {
+  "luajit-2.0": { url: "https://github.com/luajit/luajit.git", branch: "v2.0", binary: "luajit" },
+  "luajit-2.1": { url: "https://github.com/luajit/luajit.git", branch: "v2.1", binary: "luajit" },
+  "luajit-2.1.0-beta3": { url: "https://github.com/luajit/luajit.git", branch: "v2.1.0-beta3", binary: "luajit-2.1.0-beta3" },
+  "luajit-master": { url: "https://github.com/luajit/luajit.git", branch: "master", binary: "luajit" },
+  "luajit-openresty": { url: "https://github.com/openresty/luajit2.git", branch: "v2.1-agentzh", binary: "luajit" }
+};
+
+function getOperatingSystem() {
+  const platform = process.platform;
+  return {
+    isWindows: platform.startsWith("win32"),
+    isMacOS: platform.startsWith("darwin"),
+    isLinux: platform === "linux"
+  };
+}
+
+function createPosixPath(...segments) {
+  return path.posix.join(...segments);
+}
+
+function getCurrentDirectory() {
+  return process.cwd().split(path.sep).join(path.posix.sep);
+}
+
+async function checkFileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function logMessage(message) {
+  core.notice(`gh-actions-lua: ${message}`);
+}
+
+function logWarning(message) {
+  core.warning(`gh-actions-lua: ${message}`);
+}
+
+async function setupLuaJITSymlinks(sourceDir, installDir, binaryName) {
+  const os = getOperatingSystem();
+  const binDir = createPosixPath(installDir, "bin");
+  
+  if (os.isWindows) {
+    await fs.copyFile(
+      createPosixPath(sourceDir, "lua51.dll"),
+      createPosixPath(installDir, "bin", "lua51.dll")
+    );
+    await fs.copyFile(
+      createPosixPath(sourceDir, "lua51.dll"),
+      createPosixPath(installDir, "lib", "lua51.dll")
+    );
+    await exec.exec(`ln -s ${binaryName} lua.exe`, undefined, { cwd: binDir });
+  } else {
+    await exec.exec(`ln -s ${binaryName} lua`, undefined, { cwd: binDir });
+  }
+}
+
+async function buildLuaJIT(installPath, version) {
+  const versionKey = version.substring("luajit-".length);
+  let config = LUAJIT_CONFIG[version];
+  
+  if (!config) {
+    config = {
+      url: LUAJIT_CONFIG["luajit-master"].url,
+      branch: `v${versionKey}`,
+      binary: "luajit"
+    };
+  }
+
+  const buildDir = path.join(process.env.RUNNER_TEMP, LUA_BUILD_DIR);
+  const compileFlags = core.getInput('luaCompileFlags');
+  const repoName = config.url.match(/.*\/(.*)\.git/)[1];
+
+  await io.mkdirP(buildDir);
+  await exec.exec(`git clone --branch ${config.branch} --single-branch ${config.url}`, undefined, {
+    cwd: buildDir
+  });
+
+  const os = getOperatingSystem();
+  let makeFlags = "-j";
+  
+  if (os.isMacOS) {
+    makeFlags += " MACOSX_DEPLOYMENT_TARGET=10.15";
+  }
+  
+  if (compileFlags) {
+    makeFlags += ` ${compileFlags}`;
+  }
+
+  const projectDir = createPosixPath(buildDir, repoName);
+  await exec.exec(`make ${makeFlags}`, undefined, {
+    cwd: projectDir,
+    ...(os.isWindows ? { env: { SHELL: 'cmd' } } : {})
+  });
+
+  await exec.exec(`make -j install PREFIX="${installPath}"`, undefined, {
+    cwd: projectDir
+  });
+
+  await setupLuaJITSymlinks(
+    createPosixPath(projectDir, "src"),
+    installPath,
+    config.binary
+  );
+}
+
+async function linkWithManifest(workDir, linkCommand, outputFile, objectFiles) {
+  await exec.exec(`${linkCommand} /out:${outputFile}`, objectFiles, { cwd: workDir });
+  
+  const manifestFile = `${outputFile}.manifest`;
+  if (await checkFileExists(manifestFile)) {
+    await exec.exec("mt /nologo", ["-manifest", manifestFile, `-outputresource:${outputFile}`], {
+      cwd: workDir
+    });
+  }
+}
+
+async function copyFiles(targetDir, sourceDir, fileList) {
+  await io.mkdirP(targetDir);
+  for (const file of fileList) {
+    const fileName = path.posix.basename(file);
+    await fs.copyFile(createPosixPath(sourceDir, file), createPosixPath(targetDir, fileName));
+  }
+}
+
+async function buildLuaWindows(extractPath, installPath, version) {
+  const compileFlags = core.getInput('luaCompileFlags');
+  const compiler = "cl /nologo /MD /O2 /W3 /c /D_CRT_SECURE_NO_DEPRECATE";
+  
+  const compiledObjects = {
+    lib: [],
+    lua: [],
+    luac: []
+  };
+
+  const sourceFiles = {
+    lua: ["lua.c"],
+    luac: ["luac.c", "print.c"]
+  };
+
+  const sourceDir = createPosixPath(extractPath, "src");
+  const files = await fs.readdir(sourceDir);
+
+  for (const file of files) {
+    if (file.endsWith(".c")) {
+      let category = "lib";
+      if (sourceFiles.lua.includes(file)) category = "lua";
+      else if (sourceFiles.luac.includes(file)) category = "luac";
+
+      const sourcePath = createPosixPath("src", file);
+      const compilerArgs = category === "lib" 
+        ? ["-DLUA_BUILD_AS_DLL", sourcePath]
+        : [sourcePath];
+
+      compiledObjects[category].push(file.replace(".c", ".obj"));
+      await exec.exec(compiler, compilerArgs, { cwd: extractPath });
+    }
+  }
+
+  const versionParts = version.split(".");
+  const libFile = `lua${versionParts[0]}${versionParts[1]}.lib`;
+  const dllFile = `lua${versionParts[0]}${versionParts[1]}.dll`;
+
+  compiledObjects.lua = [...compiledObjects.lua, libFile];
+  compiledObjects.luac = [...compiledObjects.luac, ...compiledObjects.lib];
+
+  await linkWithManifest(extractPath, "link /nologo /DLL", dllFile, compiledObjects.lib);
+  await linkWithManifest(extractPath, "link /nologo", "luac.exe", compiledObjects.luac);
+  await linkWithManifest(extractPath, "link /nologo", "lua.exe", compiledObjects.lua);
+
+  const headerFile = await checkFileExists(createPosixPath(sourceDir, "lua.hpp")) ? "lua.hpp" : "../etc/lua.hpp";
+  const headers = ["lua.h", "luaconf.h", "lualib.h", "lauxlib.h", headerFile];
+
+  await copyFiles(createPosixPath(installPath, "bin"), extractPath, ["lua.exe", "luac.exe", dllFile]);
+  await copyFiles(createPosixPath(installPath, "lib"), extractPath, [dllFile, libFile]);
+  await copyFiles(createPosixPath(installPath, "include"), sourceDir, headers);
+}
+
+async function buildStandardLua(installPath, version) {
+  const extractPath = createPosixPath(process.env.RUNNER_TEMP, LUA_BUILD_DIR, `lua-${version}`);
+  const compileFlags = core.getInput('luaCompileFlags');
+
+  const sourceArchive = await tc.downloadTool(`https://lua.org/ftp/lua-${version}.tar.gz`);
+  await io.mkdirP(extractPath);
+  await tc.extractTar(sourceArchive, path.join(process.env.RUNNER_TEMP, LUA_BUILD_DIR));
+
+  const os = getOperatingSystem();
+  
+  if (os.isWindows) {
+    return await buildLuaWindows(extractPath, installPath, version);
+  }
+
+  if (os.isMacOS) {
+    await exec.exec("brew install readline ncurses");
+  } else {
+    await exec.exec("sudo apt-get install -q libreadline-dev libncurses-dev", undefined, {
+      env: { DEBIAN_FRONTEND: "noninteractive", TERM: "linux" }
+    });
+  }
+
+  let makeCommand = `-j ${os.isMacOS ? "macosx" : "linux"}`;
+  if (compileFlags) {
+    makeCommand += ` ${compileFlags}`;
+  }
+
+  await exec.exec(`make ${makeCommand}`, undefined, { cwd: extractPath });
+  await exec.exec(`make -j INSTALL_TOP="${installPath}" install`, undefined, { cwd: extractPath });
+}
+
+async function installLua(installPath, version) {
+  if (version.startsWith("luajit-")) {
+    return await buildLuaJIT(installPath, version);
+  }
+  return await buildStandardLua(installPath, version);
+}
+
+function generateCacheKey(version, flags) {
+  return `lua:${version}:${process.platform}:${process.arch}:${flags}`;
+}
+
 async function main() {
   await validateSubscription();
 
-  let luaVersion = core.getInput('luaVersion', { required: true })
-
-  if (VERSION_ALIASES[luaVersion]) {
-    luaVersion = VERSION_ALIASES[luaVersion]
-  }
-
-  const luaInstallPath = pathJoin(processCwd(), LUA_PREFIX)
-
-  let toolCacheDir = tc.find('lua', luaVersion)
-
-  if (!toolCacheDir) {
-    const cacheKey = makeCacheKey(luaVersion, core.getInput('luaCompileFlags') || "")
-    if (core.getInput('buildCache') == 'true') {
-      const restoredCache = await ch.restoreCache([luaInstallPath], cacheKey)
-      if (restoredCache) {
-        notice(`Cache restored: ${restoredCache}`)
-      } else {
-        notice(`No cache available, clean build`)
-      }
-    }
-
-    if (!(await exists(luaInstallPath))) {
-      await install(luaInstallPath, luaVersion)
-      try {
-        notice(`Storing into cache: ${cacheKey}`)
-        await ch.saveCache([luaInstallPath], cacheKey)
-      } catch (e) {
-        warning(`Failed to save to cache (continuing anyway): ${e}`)
-      }
-    }
-
-    toolCacheDir = await tc.cacheDir(luaInstallPath, 'lua', luaVersion)
-  }
-
-  // If .lua doesn't exist, symlink it to the tool cache dir
-  if (toolCacheDir && !(await exists(luaInstallPath))) {
-    await fsp.symlink(toolCacheDir, luaInstallPath);
-  }
-
-  core.addPath(pathJoin(luaInstallPath, "bin"))
+  let requestedVersion = core.getInput('luaVersion', { required: true });
   
-  // see https://github.com/ruby/setup-ruby/issues/543
-  process.exit()
+  if (LUA_VERSIONS[requestedVersion]) {
+    requestedVersion = LUA_VERSIONS[requestedVersion];
+  }
+
+  const installPath = createPosixPath(getCurrentDirectory(), LUA_INSTALL_DIR);
+  let cachedToolDir = tc.find('lua', requestedVersion);
+
+  if (!cachedToolDir) {
+    const cacheKey = generateCacheKey(requestedVersion, core.getInput('luaCompileFlags') || "");
+    
+    if (core.getInput('buildCache') === 'true') {
+      const restoredCache = await ch.restoreCache([installPath], cacheKey);
+      if (restoredCache) {
+        logMessage(`Cache restored: ${restoredCache}`);
+      } else {
+        logMessage("No cache available, performing clean build");
+      }
+    }
+
+    if (!(await checkFileExists(installPath))) {
+      await installLua(installPath, requestedVersion);
+      try {
+        logMessage(`Storing into cache: ${cacheKey}`);
+        await ch.saveCache([installPath], cacheKey);
+      } catch (error) {
+        logWarning(`Failed to save to cache (continuing anyway): ${error}`);
+      }
+    }
+
+    cachedToolDir = await tc.cacheDir(installPath, 'lua', requestedVersion);
+  }
+
+  if (cachedToolDir && !(await checkFileExists(installPath))) {
+    await fs.symlink(cachedToolDir, installPath);
+  }
+
+  core.addPath(createPosixPath(installPath, "bin"));
+  process.exit();
 }
 
-main().catch(err => {
-  core.setFailed(`Failed to install Lua: ${err}`);
-})
-
+main().catch(error => {
+  core.setFailed(`Failed to install Lua: ${error}`);
+});
 module.exports = __webpack_exports__;
 /******/ })()
 ;

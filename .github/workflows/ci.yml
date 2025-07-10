@@ -1,0 +1,77 @@
+name: continuous-integration
+
+on: [push, pull_request]
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["5.1.5", "5.2.4", "5.3.6", "5.4.7", "luajit", "luajit-2.0", "luajit-2.1", "luajit-2.0.5", "luajit-2.1.0-beta3", "luajit-openresty", "5.1", "5.4"]
+        platform: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        exclude:
+          - version: "luajit-2.0"
+            platform: "macos-latest"
+          - version: "luajit-2.0.5"
+            platform: "macos-latest"
+          - version: "luajit-2.0.5"
+            platform: "windows-latest"
+          - version: "luajit-2.1.0-beta3"
+            platform: "windows-latest"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6 # v2.8.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # main
+
+    - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
+    - name: Setup Lua Runtime
+      uses: './'
+      with:
+        luaVersion: ${{ matrix.version }}
+        buildCache: false
+
+    - name: Verify Installation
+      run: lua -e "print('Lua runtime verified successfully')"
+
+  cache-verification:
+    needs: validate
+
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["5.1.5", "5.2.4", "5.3.6", "5.4.7", "luajit", "luajit-2.0", "luajit-2.1", "luajit-2.0.5", "luajit-2.1.0-beta3", "luajit-openresty", "5.1", "5.4"]
+        platform: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        exclude:
+          - version: "luajit-2.0"
+            platform: "macos-latest"
+          - version: "luajit-2.0.5"
+            platform: "macos-latest"
+          - version: "luajit-2.0.5"
+            platform: "windows-latest"
+          - version: "luajit-2.1.0-beta3"
+            platform: "windows-latest"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@17d0e2bd7d51742c71671bd19fa12bdc9d40a3d6 # v2.8.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # main
+
+    - name: Restore Cached Runtime
+      uses: './'
+      with:
+        luaVersion: ${{ matrix.version }}
+
+    - name: Verify Cached Installation
+      run: lua -e "print('Cached Lua runtime verified successfully')"
