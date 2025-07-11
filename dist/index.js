@@ -89310,10 +89310,10 @@ async function main() {
     if (!(await checkFileExists(installPath))) {
       await installLua(installPath, requestedVersion);
       try {
-        logMessage(`Storing into cache: ${cacheKey}`);
+        logMessage(`Caching build artifacts with key: ${cacheKey}`);
         await ch.saveCache([installPath], cacheKey);
       } catch (error) {
-        logWarning(`Failed to save to cache (continuing anyway): ${error}`);
+        logWarning(`Cache save operation failed, build will continue: ${error.message || error}`);
       }
     }
 
