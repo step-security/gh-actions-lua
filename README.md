@@ -78,7 +78,7 @@ Custom compilation options passed to the build system.
 Usage example:
 
 ```yaml
-- uses: step-security/gh-actions-lua@main
+- uses: step-security/gh-actions-lua@v11
   with:
     luaVersion: 5.3
     luaCompileFlags: LUA_CFLAGS="-DLUA_INT_TYPE=LUA_INT_INT"
