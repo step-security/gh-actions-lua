@@ -1,6 +1,6 @@
 {
   "name": "install-lua",
-  "version": "1.0.0",
+  "version": "11.0.1",
   "description": "Build and install Lua",
   "main": "main.js",
   "scripts": {
