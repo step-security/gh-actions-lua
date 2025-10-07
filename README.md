@@ -13,13 +13,13 @@ Automatically adds `.lua/bin` to the system PATH for direct `lua` command access
 Basic Lua installation: (Defaults to latest stable release, currently 5.4.7)
 
 ```yaml
-- uses: step-security/gh-actions-lua@v11
+- uses: step-security/gh-actions-lua@v12
 ```
 
 Specify Lua version:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v11
+- uses: step-security/gh-actions-lua@v12
   with:
     luaVersion: "5.1.5"
 ```
@@ -27,7 +27,7 @@ Specify Lua version:
 Install LuaJIT variant:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v11
+- uses: step-security/gh-actions-lua@v12
   with:
     luaVersion: "luajit-2.1.0-beta3"
 ```
@@ -37,7 +37,7 @@ For Windows environments, include the MSVC development tools setup:
 
 ```yaml
 - uses: ilammy/msvc-dev-cmd@v1
-- uses: step-security/gh-actions-lua@v11
+- uses: step-security/gh-actions-lua@v12
 ```
 
 ## Configuration Options
@@ -78,7 +78,7 @@ Custom compilation options passed to the build system.
 Usage example:
 
 ```yaml
-- uses: step-security/gh-actions-lua@v11
+- uses: step-security/gh-actions-lua@v12
   with:
     luaVersion: 5.3
     luaCompileFlags: LUA_CFLAGS="-DLUA_INT_TYPE=LUA_INT_INT"
@@ -102,9 +102,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v5
 
-    - uses: step-security/gh-actions-lua@v11
+    - uses: step-security/gh-actions-lua@v12
       with:
         luaVersion: "5.1.5"
 
@@ -137,8 +137,8 @@ jobs:
         luaVersion: ["5.1.5", "5.2.4", "luajit-2.1.0-beta3"]
 
     steps:
-    - uses: actions/checkout@master
-    - uses: step-security/gh-actions-lua@v11
+    - uses: actions/checkout@v5
+    - uses: step-security/gh-actions-lua@v12
       with:
         luaVersion: ${{ matrix.luaVersion }}
 
