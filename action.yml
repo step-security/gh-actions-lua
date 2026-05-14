@@ -9,7 +9,7 @@ inputs:
   luaVersion:
     description: "Target Lua version to install (supports 5.1, 5.2, 5.3, 5.4, luajit variants)"
     required: false
-    default: "5.4"
+    default: "5.5"
   luaCompileFlags:
     description: "Additional compilation flags for building Lua from source"
     required: false
