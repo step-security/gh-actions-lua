@@ -1,11 +1,11 @@
-const core = require("@actions/core");
-const axios = require('axios');
-const exec = require("@actions/exec");
-const io = require("@actions/io");
-const tc = require("@actions/tool-cache");
-const ch = require("@actions/cache");
-const fs = require("fs");
-const path = require("path");
+import * as core from "@actions/core";
+import axios from "axios";
+import * as exec from "@actions/exec";
+import * as io from "@actions/io";
+import * as tc from "@actions/tool-cache";
+import * as ch from "@actions/cache";
+import fs from "node:fs";
+import path from "node:path";
 
 async function validateSubscription() {
   let repoPrivate;
@@ -58,9 +58,10 @@ const LUA_INSTALL_DIR = ".lua";
 
 const LUA_VERSIONS = {
   "5.1": "5.1.5",
-  "5.2": "5.2.4", 
+  "5.2": "5.2.4",
   "5.3": "5.3.6",
   "5.4": "5.4.8",
+  "5.5": "5.5.0",
   "luajit": "luajit-2.1"
 };
 
